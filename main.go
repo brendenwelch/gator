@@ -1,28 +1,38 @@
 package main
 
 import (
-	"fmt"
 	"log"
+	"os"
 
 	"github.com/brendenwelch/gator/internal/config"
 )
 
+type state struct {
+	cfg *config.Config
+}
+
 func main() {
+	if len(os.Args) < 2 {
+		log.Fatalf("no command specified")
+	}
+
+	s := state{}
+
 	cfg, err := config.Read()
 	if err != nil {
 		log.Fatalf("error reading config: %v", err)
 	}
+	s.cfg = &cfg
 
-	if err = cfg.SetUser("brenden"); err != nil {
-		log.Fatalf("error setting user in config: %v", err)
+	cmds := commands{
+		callbacks: map[string]func(*state, command) error{},
 	}
+	cmds.register("login", handlerLogin)
 
-	cfg, err = config.Read()
-	if err != nil {
-		log.Fatalf("error reading config: %v", err)
+	cmd := command{}
+	cmd.name = os.Args[1]
+	if len(os.Args) > 2 {
+		cmd.args = os.Args[2:]
 	}
-
-	fmt.Println("Config contents:")
-	fmt.Printf("- Database URL: %v\n", cfg.Db_url)
-	fmt.Printf("- Username: %v\n", cfg.Current_user_name)
+	cmds.run(&s, cmd)
 }
