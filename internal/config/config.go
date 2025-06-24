@@ -6,12 +6,12 @@ import (
 )
 
 type Config struct {
-	Db_url            *string `json:"db_url"`
-	Current_user_name *string `json:"current_user_name"`
+	Db_url            string `json:"db_url"`
+	Current_user_name string `json:"current_user_name"`
 }
 
 func (c *Config) SetUser(user string) error {
-	c.Current_user_name = &user
+	c.Current_user_name = user
 
 	data, err := json.Marshal(c)
 	if err != nil {
