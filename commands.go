@@ -118,22 +118,79 @@ func handlerAddFeed(s *state, cmd command) error {
 	if err != nil {
 		log.Fatalf("failed to add feed to db: %v\n", err)
 	}
-	fmt.Printf("%v\n", feed)
+	feedfollow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		log.Fatalf("failed to create feed follow: %v\n", err)
+	}
+	fmt.Printf("%v added and followed %v\n", feedfollow.UserName, feedfollow.FeedName)
 	return nil
 }
 
 func handlerFeeds(s *state, _ command) error {
 	feeds, err := s.db.Feeds(context.Background())
 	if err != nil {
-		log.Fatalf("failed to retrieve feeds from db: %v", err)
+		log.Fatalf("failed to retrieve feeds from db: %v\n", err)
 	}
 
 	for i := range feeds {
 		user, err := s.db.GetUserByID(context.Background(), feeds[i].UserID)
 		if err != nil {
-			log.Fatalf("failed to retrieve user from db: %v", err)
+			log.Fatalf("failed to retrieve user from db: %v\n", err)
 		}
 		fmt.Printf("%v @ %v added by %v\n", feeds[i].Name, feeds[i].Url, user.Name)
+	}
+	return nil
+}
+
+func handlerFollow(s *state, cmd command) error {
+	if len(cmd.args) < 1 {
+		log.Fatalf("missing url for command %v\n", cmd.name)
+	}
+
+	user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
+	if err != nil {
+		log.Fatalf("failed to retrieve user from db: %v\n", err)
+	}
+	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
+	if err != nil {
+		log.Fatalf("failed to retrieve feed from db: %v\n", err)
+	}
+	feedfollow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID:        uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		UserID:    user.ID,
+		FeedID:    feed.ID,
+	})
+	if err != nil {
+		log.Fatalf("failed to create feed follow: %v\n", err)
+	}
+	fmt.Printf("%v followed %v\n", feedfollow.UserName, feedfollow.FeedName)
+
+	return nil
+}
+
+func handlerFollowing(s *state, cmd command) error {
+	user_id, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
+	if err != nil {
+		log.Fatalf("failed to retrieve user from db: %v\n", err)
+	}
+	follows, err := s.db.GetFeedFollowsForUser(context.Background(), user_id.ID)
+	if err != nil {
+		log.Fatalf("failed to retrieve feed follows from db: %v\n", err)
+	}
+	for i := range follows {
+		feed, err := s.db.GetFeedByID(context.Background(), follows[i].FeedID)
+		if err != nil {
+			log.Fatalf("failed to retrieve feed from db: %v\n", err)
+		}
+		fmt.Printf("%v\n", feed.Name)
 	}
 	return nil
 }

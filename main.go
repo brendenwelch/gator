@@ -17,18 +17,18 @@ type state struct {
 
 func main() {
 	if len(os.Args) < 2 {
-		log.Fatalf("no command specified")
+		log.Fatalf("no command specified\n")
 	}
 
 	s := state{}
 	cfg, err := config.Read()
 	if err != nil {
-		log.Fatalf("error reading config: %v", err)
+		log.Fatalf("error reading config: %v\n", err)
 	}
 	s.cfg = &cfg
 	db, err := sql.Open("postgres", s.cfg.Db_url)
 	if err != nil {
-		log.Fatalf("error opening database: %v", err)
+		log.Fatalf("error opening database: %v\n", err)
 	}
 	s.db = database.New(db)
 
@@ -42,6 +42,8 @@ func main() {
 	cmds.register("agg", handlerAgg)
 	cmds.register("addfeed", handlerAddFeed)
 	cmds.register("feeds", handlerFeeds)
+	cmds.register("follow", handlerFollow)
+	cmds.register("following", handlerFollowing)
 	cmd := command{}
 	cmd.name = os.Args[1]
 	if len(os.Args) > 2 {
