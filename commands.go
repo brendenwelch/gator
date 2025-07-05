@@ -98,15 +98,11 @@ func handlerAgg(_ *state, _ command) error {
 	return nil
 }
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
 		log.Fatalf("not enough arguments. expecting name, url\n")
 	}
 
-	user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
-	if err != nil {
-		log.Fatalf("failed to retrived user from db: %v\n", err)
-	}
 	feed, err := s.db.AddFeed(context.Background(), database.AddFeedParams{
 		ID:        uuid.New(),
 		CreatedAt: time.Now(),
@@ -148,15 +144,11 @@ func handlerFeeds(s *state, _ command) error {
 	return nil
 }
 
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 1 {
 		log.Fatalf("missing url for command %v\n", cmd.name)
 	}
 
-	user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
-	if err != nil {
-		log.Fatalf("failed to retrieve user from db: %v\n", err)
-	}
 	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
 	if err != nil {
 		log.Fatalf("failed to retrieve feed from db: %v\n", err)
@@ -176,12 +168,8 @@ func handlerFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollowing(s *state, cmd command) error {
-	user_id, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
-	if err != nil {
-		log.Fatalf("failed to retrieve user from db: %v\n", err)
-	}
-	follows, err := s.db.GetFeedFollowsForUser(context.Background(), user_id.ID)
+func handlerFollowing(s *state, cmd command, user database.User) error {
+	follows, err := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		log.Fatalf("failed to retrieve feed follows from db: %v\n", err)
 	}
@@ -193,4 +181,15 @@ func handlerFollowing(s *state, cmd command) error {
 		fmt.Printf("%v\n", feed.Name)
 	}
 	return nil
+}
+
+// -- Middleware
+func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
+	return func(s *state, cmd command) error {
+		user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
+		if err != nil {
+			log.Fatalf("failed to retrived user from db: %v\n", err)
+		}
+		return handler(s, cmd, user)
+	}
 }
