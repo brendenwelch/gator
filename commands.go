@@ -31,22 +31,22 @@ func (c *commands) register(name string, f func(*state, command) error) {
 
 func handlerLogin(s *state, cmd command) error {
 	if len(cmd.args) == 0 {
-		log.Fatalf("missing username for command '%v'\n", cmd.name)
+		log.Fatalf("missing username for command %v\n", cmd.name)
 	}
 	_, err := s.db.GetUser(context.Background(), cmd.args[0])
 	if err != nil {
-		log.Fatalf("user %v not registered\n", cmd.args[0])
+		log.Fatalf("failed to get user %v from db: %v\n", cmd.args[0], err)
 	}
 	if err := s.cfg.SetUser(cmd.args[0]); err != nil {
 		return err
 	}
-	fmt.Printf("User has been set to '%v'\n", cmd.args[0])
+	fmt.Printf("%v now logged in\n", cmd.args[0])
 	return nil
 }
 
 func handlerRegister(s *state, cmd command) error {
 	if len(cmd.args) == 0 {
-		log.Fatalf("missing username for command '%v'\n", cmd.name)
+		log.Fatalf("missing username for command %v\n", cmd.name)
 	}
 
 	_, err := s.db.CreateUser(context.Background(), database.CreateUserParams{
@@ -56,14 +56,14 @@ func handlerRegister(s *state, cmd command) error {
 		Name:      cmd.args[0],
 	})
 	if err != nil {
-		log.Fatalf("user %v already exists\n", cmd.args[0])
+		log.Fatalf("failed to create user %v: %v\n", cmd.args[0], err)
 	}
 	fmt.Printf("%v has been registered\n", cmd.args[0])
 
 	if err := s.cfg.SetUser(cmd.args[0]); err != nil {
 		return err
 	}
-	fmt.Printf("User has been set to '%v'\n", cmd.args[0])
+	fmt.Printf("%v now logged in\n", cmd.args[0])
 	return nil
 }
 
@@ -71,6 +71,7 @@ func handlerReset(s *state, cmd command) error {
 	if err := s.db.Reset(context.Background()); err != nil {
 		log.Fatalf("failed to reset database: %v\n", err)
 	}
+	fmt.Println("database reset")
 	return nil
 }
 
@@ -78,6 +79,9 @@ func handlerUsers(s *state, cmd command) error {
 	users, err := s.db.GetUsers(context.Background())
 	if err != nil {
 		return err
+	}
+	if len(users) > 0 {
+		fmt.Println("registered users:")
 	}
 	for i := range users {
 		if users[i].Name == s.cfg.Current_user_name {
@@ -90,6 +94,7 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(_ *state, _ command) error {
+	// TODO: better logging
 	feed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
 	if err != nil {
 		log.Fatalf("failed to fetch feed: %v\n", err)
@@ -134,6 +139,9 @@ func handlerFeeds(s *state, _ command) error {
 		log.Fatalf("failed to retrieve feeds from db: %v\n", err)
 	}
 
+	if len(feeds) > 0 {
+		fmt.Println("aggregated feeds:")
+	}
 	for i := range feeds {
 		user, err := s.db.GetUserByID(context.Background(), feeds[i].UserID)
 		if err != nil {
@@ -173,6 +181,9 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
 	if err != nil {
 		log.Fatalf("failed to retrieve feed follows from db: %v\n", err)
 	}
+	if len(follows) > 0 {
+		fmt.Printf("%v currently following:\n", user.Name)
+	}
 	for i := range follows {
 		feed, err := s.db.GetFeedByID(context.Background(), follows[i].FeedID)
 		if err != nil {
@@ -199,15 +210,4 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 		log.Fatalf("failed to remove feed follow from db: %v\n", err)
 	}
 	return nil
-}
-
-// -- Middleware
-func middlewareLoggedIn(handler func(s *state, cmd command, user database.User) error) func(*state, command) error {
-	return func(s *state, cmd command) error {
-		user, err := s.db.GetUser(context.Background(), s.cfg.Current_user_name)
-		if err != nil {
-			log.Fatalf("failed to retrived user from db: %v\n", err)
-		}
-		return handler(s, cmd, user)
-	}
 }
