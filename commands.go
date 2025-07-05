@@ -26,7 +26,7 @@ func (c *commands) run(s *state, cmd command) error {
 
 func (c *commands) register(name string, f func(*state, command) error) {
 	c.callbacks[name] = f
-	fmt.Printf("command '%v' successfully registered\n", name)
+	//fmt.Printf("command '%v' successfully registered\n", name)
 }
 
 func handlerLogin(s *state, cmd command) error {
@@ -100,7 +100,7 @@ func handlerAgg(_ *state, _ command) error {
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) < 2 {
-		log.Fatalf("not enough arguments. expecting name, url\n")
+		log.Fatalf("missing name, url for command %v\n", cmd.name)
 	}
 
 	feed, err := s.db.AddFeed(context.Background(), database.AddFeedParams{
@@ -179,6 +179,24 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
 			log.Fatalf("failed to retrieve feed from db: %v\n", err)
 		}
 		fmt.Printf("%v\n", feed.Name)
+	}
+	return nil
+}
+
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) < 1 {
+		log.Fatalf("missing url for command %v\n", cmd.name)
+	}
+
+	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
+	if err != nil {
+		log.Fatalf("failed to retrieve feed from db: %v\n", err)
+	}
+	if err := s.db.UnfollowFeed(context.Background(), database.UnfollowFeedParams{
+		UserID: user.ID,
+		FeedID: feed.ID,
+	}); err != nil {
+		log.Fatalf("failed to remove feed follow from db: %v\n", err)
 	}
 	return nil
 }
