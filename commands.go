@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"strconv"
 	"time"
 
 	"github.com/brendenwelch/gator/internal/database"
@@ -133,8 +134,47 @@ func scrapeFeeds(s *state) {
 	}
 
 	for _, item := range fetchedfeed.Channel.Item {
-		fmt.Printf("%v\n", item.Title)
+		pubDate, err := time.Parse("Mon, 02 Jan 2006 03:04:05 -07:00", item.PubDate)
+		if err != nil {
+			pubDate = time.Now()
+		}
+		if err = s.db.CreatePost(context.Background(), database.CreatePostParams{
+			ID:          uuid.New(),
+			CreatedAt:   time.Now(),
+			UpdatedAt:   time.Now(),
+			Title:       item.Title,
+			Url:         item.Link,
+			Description: item.Description,
+			PublishedAt: pubDate,
+			FeedID:      feed.ID,
+		}); err != nil {
+			log.Printf("failed to create post in db: %v", err)
+		}
 	}
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	var limit int32 = 2
+	if len(cmd.args) > 0 {
+		arg, err := strconv.Atoi(cmd.args[0])
+		if err == nil {
+			limit = int32(arg)
+		}
+	}
+
+	posts, err := s.db.GetPostsByUser(context.Background(), database.GetPostsByUserParams{
+		Name:  user.Name,
+		Limit: limit,
+	})
+	if err != nil {
+		log.Fatalf("failed to retrieve posts from db: %v", err)
+	}
+	fmt.Printf("%v most recent posts followed by %v:\n", limit, user.Name)
+	for _, post := range posts {
+		fmt.Printf("- %v\n", post.Title)
+	}
+
+	return nil
 }
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {
