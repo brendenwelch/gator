@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -93,14 +94,47 @@ func handlerUsers(s *state, cmd command) error {
 	return nil
 }
 
-func handlerAgg(_ *state, _ command) error {
-	// TODO: better logging
-	feed, err := rss.FetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
-	if err != nil {
-		log.Fatalf("failed to fetch feed: %v\n", err)
+func handlerAgg(s *state, cmd command) error {
+	if len(cmd.args) < 1 {
+		log.Fatalf("missing time between requests for command %v\n", cmd.name)
 	}
-	fmt.Printf("%v", *feed)
-	return nil
+
+	timeBetweenRequests, err := time.ParseDuration(cmd.args[0])
+	if err != nil {
+		log.Fatalf("failed to parse duration from %v argument %v: %v\n", cmd.name, cmd.args[0], err)
+	}
+
+	ticker := time.NewTicker(timeBetweenRequests)
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
+}
+
+func scrapeFeeds(s *state) {
+	feed, err := s.db.GetNextFeedToFetch(context.Background())
+	if err != nil {
+		log.Fatalf("failed to retrieve next feed to fetch from db: %v\n", err)
+	}
+
+	if err := s.db.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{
+		ID:        feed.ID,
+		UpdatedAt: time.Now(),
+		LastFetchedAt: sql.NullTime{
+			Time:  time.Now(),
+			Valid: true,
+		},
+	}); err != nil {
+		log.Fatalf("failed to mark feed fetched: %v\n", err)
+	}
+
+	fetchedfeed, err := rss.FetchFeed(context.Background(), feed.Url)
+	if err != nil {
+		log.Fatalf("failed to fetch feed from url: %v\n", err)
+	}
+
+	for _, item := range fetchedfeed.Channel.Item {
+		fmt.Printf("%v\n", item.Title)
+	}
 }
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {

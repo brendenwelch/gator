@@ -37,15 +37,15 @@ func main() {
 		callbacks: map[string]func(*state, command) error{},
 	}
 	cmds.register("reset", handlerReset)
-	cmds.register("users", handlerUsers)
 	cmds.register("register", handlerRegister)
 	cmds.register("login", handlerLogin)
-	cmds.register("agg", handlerAgg)
+	cmds.register("users", handlerUsers)
 	cmds.register("addfeed", middlewareLoggedIn(handlerAddFeed))
 	cmds.register("feeds", handlerFeeds)
 	cmds.register("follow", middlewareLoggedIn(handlerFollow))
-	cmds.register("following", middlewareLoggedIn(handlerFollowing))
 	cmds.register("unfollow", middlewareLoggedIn(handlerUnfollow))
+	cmds.register("following", middlewareLoggedIn(handlerFollowing))
+	cmds.register("agg", handlerAgg)
 	cmd := command{}
 	cmd.name = os.Args[1]
 	if len(os.Args) > 2 {
